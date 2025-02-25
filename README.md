@@ -1,13 +1,37 @@
-# Hardhat Project for testing Core lending contracts
+# Hardhat Project for Testing Core Lending Contracts
 
-This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, and a Hardhat Ignition module that deploys that contract.
+This project demonstrates a comprehensive testing setup for core lending contracts using Hardhat. It includes sample contracts, extensive tests for those contracts, and deployment scripts.
 
-Try running some of the following tasks:
+## Project Structure
 
+- `contracts/`: Contains the Solidity smart contracts.
+- `test/`: Contains the test scripts written in JavaScript.
+- `scripts/`: Contains the deployment scripts.
+- `hardhat.config.js`: Hardhat configuration file.
+
+## Prerequisites
+
+- Node.js
+- npm
+- Hardhat
+
+## Installation
+
+1. Clone the repository:
+    ```shell
+    git clone <repository-url>
+    cd <repository-directory>
+    ```
+
+2. Install the dependencies:
+    ```shell
+    npm install
+    ```
+
+## Running Tests
+
+The project includes a suite of tests to ensure the correctness of the lending contracts. The tests cover various scenarios such as borrowing, interest accrual, and edge cases.
+
+To run the tests, use the following command:
 ```shell
-npx hardhat help
 npx hardhat test
-REPORT_GAS=true npx hardhat test
-npx hardhat node
-npx hardhat ignition deploy ./ignition/modules/Lock.js
-```
