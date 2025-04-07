@@ -492,7 +492,7 @@ contract CToken is ERC20, Ownable {
 
     /**
      * @notice Gets the amount currently staked in the staking contract
-     * @return Amount of tokens staked
+     * @return stakedAmount Amount of tokens staked
      */
     function getStakedAmount() public view returns (uint256 stakedAmount) {
         (stakedAmount, , ) = stakingContract.getStakeInfo(address(this));

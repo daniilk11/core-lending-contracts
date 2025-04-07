@@ -1,4 +1,4 @@
-const { expect, use } = require("chai");
+const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
 
@@ -266,7 +266,7 @@ describe("Lending Contract", function () {
         });
 
         it("Should fail borrowing with insufficient collateral", async function () {
-            const { lending, mockUSDC, mockWETH, user1, user2 } = await loadFixture(
+            const { lending, mockUSDC, mockWETH, user1 } = await loadFixture(
                 deployLendingFixture
             );
 
@@ -733,13 +733,13 @@ describe("Lending Contract", function () {
                 expect(borrowRate).to.be.gte(0);
 
                 // For 0% utilization, should return base rate
-                if (borrows == 0) {
+                if (borrows === 0) {
                     const baseRatePerBlock = ethers.parseUnits("0.01", 18) / BigInt(BLOCKS_PER_YEAR);
                     expect(borrowRate).to.equal(baseRatePerBlock);
                 }
 
                 // For 100% utilization, should return max rate (base + multiplier)
-                if (cash == 0 && borrows > 0) {
+                if (cash === 0 && borrows > 0) {
                     const maxRatePerBlock = (ethers.parseUnits("0.11", 18)) / BigInt(BLOCKS_PER_YEAR); // 1% base + 10% multiplier
                     expect(borrowRate).to.equal(maxRatePerBlock);
                 }
@@ -1050,8 +1050,7 @@ describe("Lending Contract", function () {
 
             await expect(mockRouter.connect(user1).exactInputSingle(params)).to.not.be.reverted;
 
-            // Check user received 2000 USDC
-            const expectedUSDC = ethers.parseUnits("2000", 18);
+
             expect(await mockUSDC.balanceOf(user1.address))
                 .to.equal(ethers.parseUnits("12000", 18)); // Initial 10000 + 2000 from swap
         });
@@ -1134,7 +1133,7 @@ describe("Lending Contract", function () {
         }
 
         async function logBorrowState(fixture, user) {
-            const { lending, mockUSDC, mockWETH } = fixture;
+            const { lending } = fixture;
 
             const borrowBalance = await lending.getAccountBorrowedValue(user.address);
             console.log("Current Borrow Balance:", borrowBalance.toString());
