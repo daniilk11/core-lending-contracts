@@ -66,14 +66,12 @@ describe("Lending Contract", function () {
         await lending.setAllowedToken(
             await mockUSDC.getAddress(),
             await usdcCToken.getAddress(),
-            await usdcPriceFeed.getAddress(),
-            await usdcStaking.getAddress()
+            await usdcPriceFeed.getAddress()
         );
         await lending.setAllowedToken(
             await mockWETH.getAddress(),
             await wethCToken.getAddress(),
-            await wethPriceFeed.getAddress(),
-            await wethStaking.getAddress()
+            await wethPriceFeed.getAddress()
         );
 
         // Get cToken addresses
@@ -124,8 +122,8 @@ describe("Lending Contract", function () {
         await lending.connect(user).deposit(mockToken.getAddress(), collateralAmount);
         console.log(" user has deposited :", amount);
 
-        const accountCollateralValue = await lending.connect(user).healthFactor(user.getAddress());
-        console.log("Now user can borrow (AccountCollateralValue) :", accountCollateralValue.toString());
+        const healthFactor = await lending.connect(user).healthFactor(user.getAddress());
+        console.log("Now user can borrow, healthFactor is :", healthFactor.toString());
     }
 
     async function borrow(user, lending, mockToken, amount) {
@@ -241,7 +239,7 @@ describe("Lending Contract", function () {
             );
             await depositInitialLiquidity(user1, user2, lending, mockUSDC, mockWETH);
 
-            const borrowAmount = ethers.parseUnits("0.75", 18); // $1500 
+            const borrowAmount = ethers.parseUnits("0.75", 18); // $1500
             console.log("Borrow Amount:", borrowAmount.toString());
             console.log("Borrow Amount in usdc:", await lending.getUSDValue(mockWETH.getAddress(), borrowAmount));
             console.log("COLLATERAL ", await lending.connect(user1).getAccountCollateralValue(user1.getAddress()));
@@ -417,10 +415,14 @@ describe("Lending Contract", function () {
             await borrow(user1, lending, mockUSDC, "1000");
 
             const healthFactor = await lending.healthFactor(user1.address);
+            const data = await lending.getAccountInformation(user1.address);
+
             console.log("current health Factor is ", healthFactor);
+            console.log("current colateral is ", data[0]);
+            console.log("current borrow is ", data[1]);
             // Health factor should be 1.5 (accounting for 75% LTV) would be 150 0000 0000
-            expect(healthFactor).to.be.above(ethers.parseUnits("140", 8));
-            expect(healthFactor).to.be.below(ethers.parseUnits("160", 8));
+            expect(healthFactor).to.be.above(ethers.parseUnits("14", 9));
+            expect(healthFactor).to.be.below(ethers.parseUnits("16", 9));
         });
     });
 
