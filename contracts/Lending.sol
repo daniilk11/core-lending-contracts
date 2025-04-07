@@ -3,28 +3,30 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 import "@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol";
 
-    // Interface for CToken (Collateral Token)
+// Interface for CToken (Collateral Token)
 interface ICToken {
-        // View functions
-        function underlyingToken() external view returns (address);
-        function balanceOfUnderlying(address account) external view returns (uint256);
-        function borrowBalanceCurrent(address account) external view returns (uint256);
-        function loanToValue() external view returns (uint256);
+    // View functions
+    function underlyingToken() external view returns (address);
+    function balanceOfUnderlying(address account) external view returns (uint256);
+    function getUserInitialSupply(address account) external view returns (uint256);
+    function borrowBalanceCurrent(address account) external view returns (uint256);
+    function loanToValue() external view returns (uint256);
 
-        // State-changing functions
-        function mint(address user, uint256 underlyingAmount) external returns (uint256);
-        function redeem(address user, uint256 cTokenAmount) external returns (uint256);
-        function borrow(address user, uint256 borrowAmount) external;
-        function repayBorrow(address user, uint256 repayAmount) external;
-        function liquidateCollateral(
-            address account,
-            address liquidator,
-            uint256 underlyingAmount
-        ) external returns (uint256);
+    // State-changing functions
+    function mint(address user, uint256 underlyingAmount) external returns (uint256);
+    function redeem(address user, uint256 cTokenAmount) external returns (uint256);
+    function borrow(address user, uint256 borrowAmount) external;
+    function repayBorrow(address user, uint256 repayAmount) external;
+    function liquidateCollateral(
+        address account,
+        address liquidator,
+        uint256 underlyingAmount
+    ) external returns (uint256);
 }
 
 /// @title Advanced Lending Protocol
@@ -76,8 +78,8 @@ contract Lending is ReentrancyGuard, Ownable {
     error InsufficientHealthFactor();
     error AccountCannotBeLiquidated();
     error TokenAlreadySet(address token);
-    error InvalidStakingContract();
     error InvalidCtokenContract();
+    error InvalidTokenContract();
     error TransferFailed(address token, address from, address to, uint256 amount);
     error InsufficientCollateralForLiquidation(uint256 available, uint256 required);
     error InsufficientRepayTokenBalance(uint256 available, uint256 required);
@@ -92,18 +94,18 @@ contract Lending is ReentrancyGuard, Ownable {
     /// @notice Deposit tokens to earn interest
     /// @param token Address of the token to deposit
     /// @param amount Amount of tokens to deposit
-    function deposit(address token, uint256 amount) 
-        external 
-        nonReentrant 
-        moreThanZero(amount) 
-        isAllowedToken(token) 
+    function deposit(address token, uint256 amount)
+    external
+    nonReentrant
+    moreThanZero(amount)
+    isAllowedToken(token)
     {
         address cTokenAddress = s_tokenToCToken[token];
         ICToken cTokenContract = ICToken(cTokenAddress);
 
         bool success = IERC20(token).transferFrom(msg.sender, cTokenAddress, amount);
         if (!success) revert TransferFailed(token, msg.sender, cTokenAddress, amount);
-        
+
         cTokenContract.mint(msg.sender, amount);
         emit Deposit(msg.sender, token, amount);
     }
@@ -111,11 +113,11 @@ contract Lending is ReentrancyGuard, Ownable {
     /// @notice Withdraw deposited tokens
     /// @param token Address of the token to withdraw
     /// @param cTokenAmount Amount of cTokens to redeem
-    function withdraw(address token, uint256 cTokenAmount) 
-        external 
-        nonReentrant 
-        moreThanZero(cTokenAmount) 
-        isAllowedToken(token) 
+    function withdraw(address token, uint256 cTokenAmount)
+    external
+    nonReentrant
+    moreThanZero(cTokenAmount)
+    isAllowedToken(token)
     {
         address cTokenAddress = s_tokenToCToken[token];
         ICToken cTokenContract = ICToken(cTokenAddress);
@@ -130,10 +132,10 @@ contract Lending is ReentrancyGuard, Ownable {
     /// @param token Address of the token to borrow
     /// @param amount Amount of tokens to borrow
     function borrow(address token, uint256 amount)
-        external
-        nonReentrant
-        isAllowedToken(token)
-        moreThanZero(amount)
+    external
+    nonReentrant
+    isAllowedToken(token)
+    moreThanZero(amount)
     {
         address cTokenAddress = s_tokenToCToken[token];
         ICToken cTokenContract = ICToken(cTokenAddress);
@@ -150,10 +152,10 @@ contract Lending is ReentrancyGuard, Ownable {
     /// @param token Address of the token to repay
     /// @param amount Amount of tokens to repay
     function repay(address token, uint256 amount)
-        external
-        nonReentrant
-        isAllowedToken(token)
-        moreThanZero(amount)
+    external
+    nonReentrant
+    isAllowedToken(token)
+    moreThanZero(amount)
     {
         address cTokenAddress = s_tokenToCToken[token];
         ICToken cTokenContract = ICToken(cTokenAddress);
@@ -175,14 +177,14 @@ contract Lending is ReentrancyGuard, Ownable {
     /// @param repayToken Token used to repay the debt
     /// @param rewardToken Token received as reward for liquidation
     function liquidate(
-        address account, 
-        address repayToken, 
+        address account,
+        address repayToken,
         address rewardToken
-    ) 
-        external 
-        nonReentrant
-        isAllowedToken(repayToken)
-        isAllowedToken(rewardToken)
+    )
+    external
+    nonReentrant
+    isAllowedToken(repayToken)
+    isAllowedToken(rewardToken)
     {
         if (healthFactor(account) >= MIN_HEALTH_FACTOR) revert AccountCannotBeLiquidated();
 
@@ -196,7 +198,7 @@ contract Lending is ReentrancyGuard, Ownable {
 
         uint256 amountToLiquidateInUSD = getUSDValue(repayToken, amountToLiquidate);
         uint256 rewardAmount = (amountToLiquidateInUSD * 1e18) / getUSDValue(rewardToken, 1e18);
-        
+
         uint256 availableCollateral = rewardCTokenContract.balanceOfUnderlying(account);
         if (availableCollateral < rewardAmount) {
             revert InsufficientCollateralForLiquidation(availableCollateral, rewardAmount);
@@ -299,37 +301,42 @@ contract Lending is ReentrancyGuard, Ownable {
         }
     }
 
-
-    function _executePlatformLiquidation(address user, address repayToken) internal 
+    /// @notice Execute platform liquidation for an undercollateralized position
+    /// @dev Liquidates collateral, swaps to repay token if needed, and repays user's debt
+    /// @param user Address of the borrower to liquidate
+    /// @param repayToken Address of the token to repay the debt with
+    function _executePlatformLiquidation(address user, address repayToken) internal
     {
         address repayCTokenAddress = s_tokenToCToken[repayToken];
         ICToken repayCTokenContract = ICToken(repayCTokenAddress);
 
+        // Iterate through all allowed tokens to liquidate collateral
         for (uint256 i = 0; i < s_allowedTokens.length; i++) {
             address collateralToken = s_allowedTokens[i];
 
             address collateralCTokenAddress = s_tokenToCToken[collateralToken];
-            if (collateralCTokenAddress == address(0)) continue;
+            if (collateralCTokenAddress == address(0)) continue; // Skip if token not supported
 
             ICToken collateralCTokenContract = ICToken(collateralCTokenAddress);
             uint256 collateralAmount = collateralCTokenContract.balanceOfUnderlying(user);
 
-            // just transfer collateral ownership to ctoken contract, no need to swap 
-            if (collateralToken == repayToken) { 
+            // If collateral is same as repay token, transfer directly without swap
+            if (collateralToken == repayToken) {
                 collateralCTokenContract.liquidateCollateral(user, address(collateralCTokenAddress), collateralAmount);
-                continue; 
+                continue;
             }
 
             if (collateralAmount > 0) {
-
                 // Burn user's cTokens and transfer the collateral to main lending contract
                 collateralCTokenContract.liquidateCollateral(user, address(this), collateralAmount);
 
                 // Approve Uniswap to spend the collateral
                 TransferHelper.safeApprove(collateralToken, address(swapRouter), collateralAmount);
 
+                // Calculate minimum amount considering maximum slippage
                 uint256 minAmountOut = (getUSDValue(collateralToken, collateralAmount) * (100 - maxSlippage)) / 100;
-                // Setup the swap parameters
+
+                // Setup the swap parameters for Uniswap
                 ISwapRouter.ExactInputSingleParams memory params = ISwapRouter
                     .ExactInputSingleParams({
                     tokenIn: collateralToken,
@@ -342,12 +349,13 @@ contract Lending is ReentrancyGuard, Ownable {
                     sqrtPriceLimitX96: 0
                 });
 
-                // Execute the swap
+                // Execute the swap on Uniswap
                 uint256 amountReceived = swapRouter.exactInputSingle(params);
 
+                // Transfer swapped tokens to repay cToken contract
                 IERC20(repayToken).transfer(repayCTokenAddress, amountReceived);
 
-                // Repay the borrowed amount
+                // Repay the borrowed amount for the user
                 repayCTokenContract.repayBorrow(user, amountReceived);
             }
         }
@@ -365,12 +373,19 @@ contract Lending is ReentrancyGuard, Ownable {
         );
     }
 
+    /// @notice Get both borrowed and collateral values for a user
+    /// @param user Address of the user to check
+    /// @return borrowedValueInUSD Total borrowed value in USD
+    /// @return collateralValueInUSD Total collateral value in USD (adjusted by LTV)
     function getAccountInformation(address user) public view returns (uint256 borrowedValueInUSD, uint256 collateralValueInUSD)
     {
         borrowedValueInUSD = getAccountBorrowedValue(user);
         collateralValueInUSD = getAccountCollateralValue(user);
     }
 
+    /// @notice Calculate the total collateral value for a user (adjusted by LTV)
+    /// @param user Address of the user to check
+    /// @return Total collateral value in USD (adjusted by each asset's loan-to-value ratio)
     function getAccountCollateralValue(address user) public view returns (uint256) {
         uint256 totalCollateralValueInUSD = 0;
         for (uint256 index = 0; index < s_allowedTokens.length; index++) {
@@ -380,12 +395,37 @@ contract Lending is ReentrancyGuard, Ownable {
                 ICToken cTokenContract = ICToken(cTokenAddress);
                 uint256 underlyingBalance = cTokenContract.balanceOfUnderlying(user);
                 uint256 valueInUSD = getUSDValue(token, underlyingBalance);
-                totalCollateralValueInUSD += valueInUSD * cTokenContract.loanToValue();
+                // Apply loan-to-value ratio to get usable collateral value
+                totalCollateralValueInUSD += valueInUSD * cTokenContract.loanToValue() / 100;
             }
         }
         return totalCollateralValueInUSD;
     }
 
+    /// @notice Calculate a user's total earned rewards
+    /// @dev Compares current supply with initial supply to determine rewards
+    /// @param user Address of the user to check
+    /// @return Total value of rewards in USD
+    function getUserRewards(address user) public view returns (uint256) {
+        uint256 totalRewardValueInUSD = 0;
+        for (uint256 index = 0; index < s_allowedTokens.length; index++) {
+            address token = s_allowedTokens[index];
+            address cTokenAddress = s_tokenToCToken[token];
+            if (cTokenAddress != address(0)) {
+                ICToken cTokenContract = ICToken(cTokenAddress);
+                uint256 currentSupply = cTokenContract.balanceOfUnderlying(user);
+                uint256 initialSupply = cTokenContract.getUserInitialSupply(user);
+                // Calculate rewards as growth in supply (interest earned)
+                uint256 supplyReward = currentSupply > initialSupply ? currentSupply - initialSupply : 0;
+                totalRewardValueInUSD += getUSDValue(token, supplyReward);
+            }
+        }
+        return totalRewardValueInUSD;
+    }
+
+    /// @notice Calculate the total borrowed value for a user across all tokens
+    /// @param user Address of the user to check
+    /// @return Total borrowed value in USD
     function getAccountBorrowedValue(address user) public view returns (uint256) {
         uint256 totalBorrowsValueInUSD = 0;
         for (uint256 index = 0; index < s_allowedTokens.length; index++) {
@@ -401,49 +441,73 @@ contract Lending is ReentrancyGuard, Ownable {
         return totalBorrowsValueInUSD;
     }
 
+    /// @notice Convert token amount to USD value using price feed
+    /// @dev Normalizes decimals between token and price feed
+    /// @param token Address of the token to value
+    /// @param amount Amount of tokens to convert to USD
+    /// @return USD value with 18 decimal places
     function getUSDValue(address token, uint256 amount) public view returns (uint256) {
         AggregatorV3Interface priceFeed = AggregatorV3Interface(s_tokenToPriceFeed[token]);
         (, int256 price, , ,) = priceFeed.latestRoundData();
-        // scale all numbers to 18 decimals oracle have 8 decimals for 2000 will return 2000000000000000000000 (e18)
-        return (uint256(price) * amount) / 1e8;
+        // Get token decimals
+        uint8 tokenDecimals = IERC20Metadata(token).decimals();
+
+        // Scale all numbers to 18 decimals (oracle has 8 decimals)
+        return (uint256(price) * amount * 10**(18 - tokenDecimals)) / 1e8;
     }
 
+    /// @notice Calculate health factor for an account
+    /// @dev Health factor = collateral value / borrowed value * 1e10
+    /// @param account Address of the account to check
+    /// @return Health factor with 10 decimal places (1e10 = 100% healthy)
     function healthFactor(address account) public view returns (uint256) {
         (uint256 borrowedValueInUSD, uint256 collateralValueInUSD) = getAccountInformation(account);
-        if (borrowedValueInUSD == 0) return type(uint256).max;
-        return collateralValueInUSD / borrowedValueInUSD * 1e8;
+        if (borrowedValueInUSD == 0) return type(uint256).max; // If no debt, health factor is maximum
+        return (collateralValueInUSD * 1e10) / borrowedValueInUSD;
     }
 
+    /// @notice Modifier to check if a token is allowed in the protocol
+    /// @param token Address of the token to check
     modifier isAllowedToken(address token) {
         if (s_tokenToPriceFeed[token] == address(0)) revert TokenNotAllowed(token);
         _;
     }
 
+    /// @notice Modifier to verify amount is greater than zero
+    /// @param amount Value to check
     modifier moreThanZero(uint256 amount) {
         if (amount == 0) revert NeedsMoreThanZero();
         _;
     }
 
+    /// @notice Add a new token to the allowed tokens list
+    /// @dev Links token with its cToken contract and price feed
+    /// @param token Address of the underlying token
+    /// @param cToken Address of the corresponding cToken contract
+    /// @param priceFeed Address of the Chainlink price feed for the token
     function setAllowedToken(
-        address token, 
-        address cToken, 
-        address priceFeed, 
-        address stakingContract
+        address token,
+        address cToken,
+        address priceFeed
     ) external onlyOwner {
         if (s_tokenToCToken[token] != address(0)) revert TokenAlreadySet(token);
-        if (stakingContract == address(0)) revert InvalidStakingContract();
-        if (stakingContract == address(0)) revert InvalidCtokenContract();
-
+        if (cToken == address(0)) revert InvalidCtokenContract();
+        if (token == address(0)) revert InvalidTokenContract();
 
         s_allowedTokens.push(token);
         s_tokenToPriceFeed[token] = priceFeed;
         s_tokenToCToken[token] = cToken;
     }
-    
+
+    /// @notice Get list of all allowed tokens in the protocol
+    /// @return Array of token addresses
     function getAllowedTokens() external view returns (address[] memory) {
         return s_allowedTokens;
     }
 
+    /// @notice Get the cToken address for a given underlying token
+    /// @param token Address of the underlying token
+    /// @return Address of the corresponding cToken contract
     function getCTokenAddress(address token) external view returns (address) {
         return s_tokenToCToken[token];
     }
