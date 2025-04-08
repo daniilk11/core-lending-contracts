@@ -5,27 +5,61 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
+/**
+ * @title MockStaking
+ * @notice A mock implementation of a staking contract for testing purposes
+ * @dev Implements basic staking functionality with rewards distribution
+ */
 contract MockStaking is Ownable, ReentrancyGuard {
+    /// @notice The token that can be staked
     IERC20 public immutable stakingToken;
     
-    // Constants for APY calculation
-    uint256 public constant STAKING_APR = 0.1e18; // 10% APY
+    /// @notice The annual percentage rate for staking rewards (10% APY)
+    uint256 public constant STAKING_APR = 0.1e18;
+    /// @notice Number of seconds in a year
     uint256 public constant SECONDS_PER_YEAR = 31536000;
     
-    // Staking info
+    /**
+     * @notice Structure to store staking information for each user
+     * @param amount The amount of tokens staked
+     * @param timestamp The time when the stake was made
+     * @param rewardDebt The accumulated rewards debt for the user
+     */
     struct StakeInfo {
         uint256 amount;
         uint256 timestamp;
         uint256 rewardDebt;
     }
     
+    /// @notice Mapping of user addresses to their staking information
     mapping(address => StakeInfo) public stakes;
+    /// @notice Total amount of tokens staked across all users
     uint256 public totalStaked;
+    /// @notice Timestamp of the last rewards update
     uint256 public lastUpdateTime;
+    /// @notice Accumulated rewards per share for reward calculation
     uint256 public accumulatedRewardsPerShare;
     
+    /**
+     * @notice Event emitted when a user stakes tokens
+     * @param user The address of the user who staked
+     * @param amount The amount of tokens staked
+     */
     event Staked(address indexed user, uint256 amount);
+    
+    /**
+     * @notice Event emitted when a user withdraws their stake
+     * @param user The address of the user who withdrew
+     * @param amount The amount of tokens withdrawn
+     * @param rewards The amount of rewards claimed
+     */
     event Withdrawn(address indexed user, uint256 amount, uint256 rewards);
+    
+    /**
+     * @notice Event emitted when a user harvests their rewards
+     * @param user The address of the user who harvested
+     * @param rewards The amount of rewards harvested
+     */
     event RewardsHarvested(address indexed user, uint256 rewards);
     
     constructor(IERC20 _stakingToken) Ownable(msg.sender) {

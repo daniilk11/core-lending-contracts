@@ -5,13 +5,24 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 import "@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol";
 
+/**
+ * @title MockSwapRouter
+ * @notice A mock implementation of Uniswap V3 SwapRouter for testing purposes
+ * @dev Implements ISwapRouter interface with simplified swap functionality
+ */
 contract MockSwapRouter is ISwapRouter {
     // Fixed rates (scaled by 1e18)
     uint256 private constant WETH_PRICE = 2000e18; // 1 ETH = 2000 USD
     
     mapping(address => mapping(address => uint256)) public exchangeRates;
     
-    // Events to track swaps
+    /**
+     * @notice Event emitted when a swap is executed
+     * @param tokenIn The input token address
+     * @param tokenOut The output token address
+     * @param amountIn The amount of input tokens
+     * @param amountOut The amount of output tokens
+     */
     event SwapExecuted(
         address tokenIn,
         address tokenOut,
@@ -19,11 +30,21 @@ contract MockSwapRouter is ISwapRouter {
         uint256 amountOut
     );
 
+    /**
+     * @notice Event emitted when liquidity is added
+     * @param token The token address
+     * @param amount The amount of tokens added
+     */
     event LiquidityAdded(
         address token,
         uint256 amount
     );
 
+    /**
+     * @notice Constructor initializes exchange rates for WETH and USDC
+     * @param weth The WETH token address
+     * @param usdc The USDC token address
+     */
     constructor(address weth, address usdc) {
         // Set exchange rates both ways
         exchangeRates[weth][usdc] = WETH_PRICE; // 1 ETH = 2000 USDC
